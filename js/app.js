@@ -1,267 +1,454 @@
-/* app.js — Orquestrador principal */
+/* ═══════════════════════════════════════════════════════════════
+   app.js — Orquestrador principal
+   Conecta DOM ↔ API ↔ Calculator ↔ Chart
+   ═══════════════════════════════════════════════════════════════ */
+
 ;(function () {
   'use strict';
 
-  function formatBRL(v) {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
-  }
-  function formatBRL2(v) {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
-  }
-  function parseFipePrice(s) {
-    if (!s) return 0;
-    return parseFloat(s.replace(/[R$\s.]/g, '').replace(',', '.'));
+  /* ─── Utilidades ─── */
+
+  /** Formata número para BRL (sem centavos) */
+  function formatBRL(value) {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value);
   }
 
+  /** Formata número para BRL (com 2 casas) */
+  function formatBRL2(value) {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  }
+
+  /** Parse de preço FIPE string "R$ 10.000,00" → number */
+  function parseFipePrice(str) {
+    if (!str) return 0;
+    return parseFloat(
+      str.replace(/[R$\s.]/g, '').replace(',', '.')
+    );
+  }
+
+  /** Mostra toast de erro por 6 segundos */
   function showToast(msg) {
-    var t = document.getElementById('toast-erro');
-    var m = document.getElementById('toast-msg');
-    m.textContent = msg;
-    t.hidden = false;
-    clearTimeout(t._timer);
-    t._timer = setTimeout(function() { t.hidden = true; }, 6000);
+    const toast = document.getElementById('toast-erro');
+    const toastMsg = document.getElementById('toast-msg');
+    toastMsg.textContent = msg;
+    toast.hidden = false;
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => { toast.hidden = true; }, 6000);
   }
 
+  /** Mostra skeleton e esconde select */
   function showSkeleton(id) {
-    var s = document.getElementById('skeleton-' + id);
-    if (s) s.hidden = false;
+    const skeleton = document.getElementById(`skeleton-${id}`);
+    if (skeleton) skeleton.hidden = false;
   }
+
   function hideSkeleton(id) {
-    var s = document.getElementById('skeleton-' + id);
-    if (s) s.hidden = true;
+    const skeleton = document.getElementById(`skeleton-${id}`);
+    if (skeleton) skeleton.hidden = true;
   }
 
-  function populateSelect(el, items, ph) {
-    el.innerHTML = '';
-    var o = document.createElement('option');
-    o.value = '';
-    o.textContent = ph;
-    el.appendChild(o);
-    items.forEach(function(item) {
-      var op = document.createElement('option');
-      op.value = item.code;
-      op.textContent = item.name;
-      el.appendChild(op);
+  /** Popula um <select> com opções */
+  function populateSelect(selectEl, items, placeholder) {
+    selectEl.innerHTML = '';
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = placeholder;
+    selectEl.appendChild(opt);
+
+    items.forEach(item => {
+      const o = document.createElement('option');
+      o.value = item.code;
+      o.textContent = item.name;
+      selectEl.appendChild(o);
     });
-    el.disabled = false;
+
+    selectEl.disabled = false;
   }
 
-  function resetSelect(el, ph) {
-    el.innerHTML = '<option value="">' + ph + '</option>';
-    el.disabled = true;
+  /** Reseta um <select> ao estado desabilitado */
+  function resetSelect(selectEl, placeholderText) {
+    selectEl.innerHTML = `<option value="">${placeholderText}</option>`;
+    selectEl.disabled = true;
   }
 
-  function animateValue(el, start, end, dur) {
-    dur = dur || 800;
-    var st = performance.now();
-    var diff = end - start;
-    function step(ct) {
-      var p = Math.min((ct - st) / dur, 1);
-      var e = 1 - (1 - p) * (1 - p);
-      el.textContent = formatBRL(Math.round(start + diff * e));
-      if (p < 1) requestAnimationFrame(step);
+  /** Animação de contagem numérica */
+  function animateValue(element, start, end, duration = 800) {
+    const startTime = performance.now();
+    const diff = end - start;
+
+    function step(currentTime) {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out quad
+      const eased = 1 - (1 - progress) * (1 - progress);
+      const current = start + diff * eased;
+      element.textContent = formatBRL(Math.round(current));
+      if (progress < 1) requestAnimationFrame(step);
     }
+
     requestAnimationFrame(step);
   }
 
-  var state = { tipo: '', marca: '', modelo: '', ano: '', veiculoFipe: null, ipca: null };
 
-  var $tipo = document.getElementById('tipo');
-  var $marca = document.getElementById('marca');
-  var $modelo = document.getElementById('modelo');
-  var $ano = document.getElementById('ano');
-  var $preco = document.getElementById('preco');
-  var $tempo = document.getElementById('tempo');
-  var $tempoValor = document.getElementById('tempo-valor');
-  var $km = document.getElementById('km');
-  var $conserv = document.getElementById('conservacao');
-  var $btnCalc = document.getElementById('btn-calcular');
-  var $form = document.getElementById('form-veiculo');
-  var $precoFipeGrupo = document.getElementById('grupo-preco-fipe');
-  var $precoFipeValor = document.getElementById('preco-fipe-valor');
-  var $emptyState = document.getElementById('empty-state');
-  var $resultados = document.getElementById('resultados');
-  var $graficoBox = document.getElementById('grafico-container');
-  var $tabelaBox = document.getElementById('tabela-container');
+  /* ─── Estado ─── */
+
+  const state = {
+    tipo: '',
+    marca: '',
+    modelo: '',
+    ano: '',
+    veiculoFipe: null,  // dados retornados pela API
+    ipca: null          // {taxa, fonte}
+  };
+
+
+  /* ─── DOM Refs ─── */
+
+  const $tipo       = document.getElementById('tipo');
+  const $marca      = document.getElementById('marca');
+  const $modelo     = document.getElementById('modelo');
+  const $ano        = document.getElementById('ano');
+  const $preco      = document.getElementById('preco');
+  const $tempo      = document.getElementById('tempo');
+  const $tempoValor = document.getElementById('tempo-valor');
+  const $km         = document.getElementById('km');
+  const $conserv    = document.getElementById('conservacao');
+  const $btnCalc    = document.getElementById('btn-calcular');
+  const $form       = document.getElementById('form-veiculo');
+
+  const $precoFipeGrupo = document.getElementById('grupo-preco-fipe');
+  const $precoFipeValor = document.getElementById('preco-fipe-valor');
+
+  const $emptyState = document.getElementById('empty-state');
+  const $resultados = document.getElementById('resultados');
+  const $graficoBox = document.getElementById('grafico-container');
+  const $tabelaBox  = document.getElementById('tabela-container');
+
+
+  /* ─── Verificação de campos obrigatórios ─── */
 
   function checkFormValidity() {
-    $btnCalc.disabled = !($tipo.value && $marca.value && $modelo.value && $ano.value && parseFloat($preco.value) > 0);
+    const tipoOk   = !!$tipo.value;
+    const marcaOk  = !!$marca.value;
+    const modeloOk = !!$modelo.value;
+    const anoOk    = !!$ano.value;
+    const precoVal = parseFloat($preco.value);
+    const precoOk  = !isNaN(precoVal) && precoVal >= 0;
+
+    $btnCalc.disabled = !(tipoOk && marcaOk && modeloOk && anoOk && precoOk);
   }
 
-  $tipo.addEventListener('change', async function() {
+
+  /* ─── Selects Encadeados (FIPE API) ─── */
+
+  // Tipo → carrega marcas
+  $tipo.addEventListener('change', async () => {
     state.tipo = $tipo.value;
     state.marca = '';
     state.modelo = '';
     state.ano = '';
     state.veiculoFipe = null;
+
     resetSelect($marca, 'Carregando marcas...');
     resetSelect($modelo, 'Selecione a marca primeiro');
     resetSelect($ano, 'Selecione o modelo primeiro');
     $precoFipeGrupo.hidden = true;
     checkFormValidity();
-    if (!state.tipo) { resetSelect($marca, 'Selecione o tipo primeiro'); return; }
+
+    if (!state.tipo) {
+      resetSelect($marca, 'Selecione o tipo primeiro');
+      return;
+    }
+
     try {
       showSkeleton('marca');
-      var m = await FipeAPI.getMarcas(state.tipo);
-      populateSelect($marca, m, 'Selecione a marca');
-    } catch (e) {
-      handleApiError(e);
+      const marcas = await FipeAPI.getMarcas(state.tipo);
+      populateSelect($marca, marcas, 'Selecione a marca');
+    } catch (err) {
+      handleApiError(err);
       resetSelect($marca, 'Erro ao carregar marcas');
     } finally {
       hideSkeleton('marca');
     }
   });
 
-  $marca.addEventListener('change', async function() {
+  // Marca → carrega modelos
+  $marca.addEventListener('change', async () => {
     state.marca = $marca.value;
     state.modelo = '';
     state.ano = '';
     state.veiculoFipe = null;
+
     resetSelect($modelo, 'Carregando modelos...');
     resetSelect($ano, 'Selecione o modelo primeiro');
     $precoFipeGrupo.hidden = true;
     checkFormValidity();
-    if (!state.marca) { resetSelect($modelo, 'Selecione a marca primeiro'); return; }
+
+    if (!state.marca) {
+      resetSelect($modelo, 'Selecione a marca primeiro');
+      return;
+    }
+
     try {
       showSkeleton('modelo');
-      var m = await FipeAPI.getModelos(state.tipo, state.marca);
-      populateSelect($modelo, m, 'Selecione o modelo');
-    } catch (e) {
-      handleApiError(e);
+      const modelos = await FipeAPI.getModelos(state.tipo, state.marca);
+      populateSelect($modelo, modelos, 'Selecione o modelo');
+    } catch (err) {
+      handleApiError(err);
       resetSelect($modelo, 'Erro ao carregar modelos');
     } finally {
       hideSkeleton('modelo');
     }
   });
 
-  $modelo.addEventListener('change', async function() {
+  // Modelo → carrega anos
+  $modelo.addEventListener('change', async () => {
     state.modelo = $modelo.value;
     state.ano = '';
     state.veiculoFipe = null;
+
     resetSelect($ano, 'Carregando anos...');
     $precoFipeGrupo.hidden = true;
     checkFormValidity();
-    if (!state.modelo) { resetSelect($ano, 'Selecione o modelo primeiro'); return; }
+
+    if (!state.modelo) {
+      resetSelect($ano, 'Selecione o modelo primeiro');
+      return;
+    }
+
     try {
       showSkeleton('ano');
-      var a = await FipeAPI.getAnos(state.tipo, state.marca, state.modelo);
-      populateSelect($ano, a, 'Selecione o ano');
-    } catch (e) {
-      handleApiError(e);
+      const anos = await FipeAPI.getAnos(state.tipo, state.marca, state.modelo);
+      populateSelect($ano, anos, 'Selecione o ano');
+    } catch (err) {
+      handleApiError(err);
       resetSelect($ano, 'Erro ao carregar anos');
     } finally {
       hideSkeleton('ano');
     }
   });
 
-  $ano.addEventListener('change', async function() {
+  // Ano → busca dados do veículo (preço FIPE)
+  $ano.addEventListener('change', async () => {
     state.ano = $ano.value;
     state.veiculoFipe = null;
     $precoFipeGrupo.hidden = true;
     checkFormValidity();
+
     if (!state.ano) return;
+
     try {
-      var v = await FipeAPI.getVeiculo(state.tipo, state.marca, state.modelo, state.ano);
-      state.veiculoFipe = v;
-      $precoFipeValor.textContent = v.price || '\u2014';
+      const veiculo = await FipeAPI.getVeiculo(state.tipo, state.marca, state.modelo, state.ano);
+      state.veiculoFipe = veiculo;
+
+      // Mostrar preço FIPE
+      $precoFipeValor.textContent = veiculo.price || '—';
       $precoFipeGrupo.hidden = false;
+
+      // Auto-preencher preço de compra se vazio
       if (!$preco.value) {
-        var f = parseFipePrice(v.price);
-        if (f > 0) $preco.value = f;
+        const fipeNum = parseFipePrice(veiculo.price);
+        if (fipeNum > 0) $preco.value = fipeNum;
       }
+
       checkFormValidity();
-    } catch (e) {
-      handleApiError(e);
+    } catch (err) {
+      handleApiError(err);
     }
   });
 
-  $tempo.addEventListener('input', function() {
+
+  /* ─── Range slider ─── */
+
+  $tempo.addEventListener('input', () => {
     $tempoValor.textContent = $tempo.value;
   });
+
+  /* ─── Validação em tempo real ─── */
   $preco.addEventListener('input', checkFormValidity);
 
-  $form.addEventListener('submit', async function(e) {
+
+  /* ─── Cálculo Principal ─── */
+
+  $form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    var pc = parseFloat($preco.value);
-    var anos = parseInt($tempo.value, 10);
-    if (!pc || pc <= 0) {
+
+    const precoCompra = parseFloat($preco.value);
+    const anos = parseInt($tempo.value, 10);
+
+    // Validação
+    if (isNaN(precoCompra) || precoCompra < 0) {
       $preco.classList.add('invalid');
-      showToast('Informe um pre\u00e7o de compra v\u00e1lido.');
+      showToast('Informe um preço de compra válido (pode ser 0).');
       return;
     }
     $preco.classList.remove('invalid');
+
     if (!anos || anos < 1) {
-      showToast('Selecione o tempo de proje\u00e7\u00e3o.');
+      showToast('Selecione o tempo de projeção.');
       return;
     }
+
+    // Obter o preço FIPE como base para os cálculos
+    if (!state.veiculoFipe || !state.veiculoFipe.price) {
+      showToast('Selecione um veículo válido com preço FIPE disponível.');
+      return;
+    }
+    const precoFipe = parseFipePrice(state.veiculoFipe.price);
+    if (!precoFipe || precoFipe <= 0) {
+      showToast('Preço FIPE indisponível para este veículo.');
+      return;
+    }
+
+    // Desabilitar botão durante cálculo
     $btnCalc.disabled = true;
     $btnCalc.textContent = 'Calculando...';
+
     try {
-      if (!state.ipca) state.ipca = await IpcaAPI.getMediaAnual();
-      var aj = { kmAnual: parseInt($km.value, 10) || 12000, conservacao: $conserv.value || 'bom' };
-      var sD = Calculator.calcularDepreciacao(pc, anos, aj);
-      var sI = Calculator.calcularInflacao(pc, anos, state.ipca.taxa);
-      var res = Calculator.calcularResumo(sD, sI, pc);
-      var tab = Calculator.gerarTabelaAnual(sD, sI, pc);
-      renderResultados(res, state.ipca.taxa);
-      renderGrafico(sD, sI);
-      renderTabela(tab);
+      // 1. Buscar IPCA (com cache)
+      if (!state.ipca) {
+        state.ipca = await IpcaAPI.getMediaAnual();
+      }
+
+      const taxaIpca = state.ipca.taxa;
+
+      // 2. Parâmetros opcionais
+      const ajustes = {
+        kmAnual: parseInt($km.value, 10) || 12000,
+        conservacao: $conserv.value || 'bom'
+      };
+
+      // 3. Calcular (baseado no preço FIPE)
+      const serieDepreciacao = Calculator.calcularDepreciacao(precoFipe, anos, ajustes);
+      const serieInflacao    = Calculator.calcularInflacao(precoFipe, anos, taxaIpca);
+      const resumo           = Calculator.calcularResumo(serieDepreciacao, serieInflacao, precoFipe, precoCompra);
+      const tabelaDados      = Calculator.gerarTabelaAnual(serieDepreciacao, serieInflacao, precoFipe);
+
+      // 4. Renderizar resultados
+      renderResultados(resumo, taxaIpca);
+      renderGrafico(serieDepreciacao, serieInflacao);
+      renderTabela(tabelaDados);
+
+      // 5. Mostrar seções
       $emptyState.hidden = true;
       $resultados.hidden = false;
       $graficoBox.hidden = false;
-      $tabelaBox.hidden = false;
-      setTimeout(function() {
+      $tabelaBox.hidden  = false;
+
+      // 6. Scroll suave até os resultados
+      setTimeout(() => {
         $resultados.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
+
     } catch (err) {
-      console.error('[App]', err);
+      console.error('[App] Erro no cálculo:', err);
       showToast('Ocorreu um erro ao calcular. Tente novamente.');
     } finally {
       $btnCalc.disabled = false;
-      $btnCalc.innerHTML = '<svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 13a8 8 0 0 1 7 7a6 6 0 0 0 3-5a9 9 0 0 0 6-8a3 3 0 0 0-3-3a9 9 0 0 0-8 6a6 6 0 0 0-5 3"/><path d="M7 14a6 6 0 0 0-3 6a6 6 0 0 0 6-3"/></svg> Calcular Desvaloriza\u00e7\u00e3o';
+      $btnCalc.innerHTML = `
+        <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 13a8 8 0 0 1 7 7a6 6 0 0 0 3-5a9 9 0 0 0 6-8a3 3 0 0 0-3-3a9 9 0 0 0-8 6a6 6 0 0 0-5 3"/><path d="M7 14a6 6 0 0 0-3 6a6 6 0 0 0 6-3"/></svg>
+        Calcular Desvalorização
+      `;
       checkFormValidity();
     }
   });
 
-  function renderResultados(r, ipca) {
-    document.getElementById('res-periodo').textContent = r.anos + ' ano' + (r.anos > 1 ? 's' : '');
-    animateValue(document.getElementById('res-valor-final'), 0, r.valorFinal);
-    document.getElementById('res-preco-compra').textContent = formatBRL(r.precoCompra);
-    document.getElementById('res-perda-total').textContent = '-' + formatBRL(r.perdaNominal);
-    document.getElementById('res-perda-percent').textContent = '-' + r.perdaPercentual.toFixed(1) + '%';
-    document.getElementById('res-ipca-taxa').textContent = '~' + (ipca * 100).toFixed(1) + '% a.a.';
-    animateValue(document.getElementById('res-valor-corrigido'), 0, r.valorCorrigido);
-    document.getElementById('res-valor-ipca').textContent = formatBRL(r.valorCorrigido);
-    document.getElementById('res-perda-real').textContent = '-' + formatBRL(r.perdaReal);
+
+  /* ─── Renderizadores ─── */
+
+  function renderResultados(resumo, taxaIpca) {
+    // Período
+    document.getElementById('res-periodo').textContent = `${resumo.anos} ano${resumo.anos > 1 ? 's' : ''}`;
+
+    // Card Depreciação (baseado na FIPE)
+    animateValue(document.getElementById('res-valor-final'), 0, resumo.valorFinal);
+    document.getElementById('res-preco-compra').textContent = formatBRL(resumo.precoCompra);
+
+    // Mostrar preço FIPE de referência
+    const $resFipe = document.getElementById('res-preco-fipe');
+    if ($resFipe) $resFipe.textContent = formatBRL(resumo.precoFipe);
+
+    document.getElementById('res-perda-total').textContent = `-${formatBRL(resumo.perdaFipeNominal)}`;
+    document.getElementById('res-perda-percent').textContent = `-${resumo.perdaFipePercentual.toFixed(1)}%`;
+
+    // Indicador de comparação compra vs FIPE
+    const $comparacao = document.getElementById('res-comparacao');
+    if ($comparacao) {
+      const diff = resumo.diferencaCompra;
+      if (diff > 0) {
+        $comparacao.textContent = `Economia: ${formatBRL(diff)}`;
+        $comparacao.className = 'result-card__comparacao result-card__comparacao--positive';
+      } else if (diff < 0) {
+        $comparacao.textContent = `Acima da FIPE: ${formatBRL(Math.abs(diff))}`;
+        $comparacao.className = 'result-card__comparacao result-card__comparacao--negative';
+      } else {
+        $comparacao.textContent = 'Comprou pelo valor FIPE';
+        $comparacao.className = 'result-card__comparacao';
+      }
+    }
+
+    // Card Inflação
+    const ipcaPercent = (taxaIpca * 100).toFixed(1);
+    document.getElementById('res-ipca-taxa').textContent = `~${ipcaPercent}% a.a.`;
+    animateValue(document.getElementById('res-valor-corrigido'), 0, resumo.valorCorrigido);
+    document.getElementById('res-valor-ipca').textContent = formatBRL(resumo.valorCorrigido);
+    document.getElementById('res-perda-real').textContent = `-${formatBRL(resumo.perdaReal)}`;
+
+    // Indicar se IPCA é fallback
     if (state.ipca && state.ipca.fonte === 'fallback') {
       document.getElementById('res-ipca-taxa').textContent += ' (est.)';
     }
   }
 
-  function renderGrafico(sD, sI) {
-    DepreciationChart.renderizar('grafico', sD, sI);
+  function renderGrafico(serieDepreciacao, serieInflacao) {
+    DepreciationChart.renderizar('grafico', serieDepreciacao, serieInflacao);
   }
 
   function renderTabela(dados) {
-    var tb = document.getElementById('tabela-body');
-    tb.innerHTML = '';
-    dados.forEach(function(r) {
-      var tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + r.ano + '\u00ba</td><td>' + formatBRL2(r.depreciado) + '</td><td>' + formatBRL2(r.corrigido) + '</td><td class="cell-loss">-' + formatBRL2(r.perdaNoAno) + '</td><td class="cell-loss">-' + formatBRL2(r.perdaAcumulada) + '</td>';
-      tb.appendChild(tr);
+    const tbody = document.getElementById('tabela-body');
+    tbody.innerHTML = '';
+
+    dados.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row.ano}º</td>
+        <td>${formatBRL2(row.depreciado)}</td>
+        <td>${formatBRL2(row.corrigido)}</td>
+        <td class="cell-loss">-${formatBRL2(row.perdaNoAno)}</td>
+        <td class="cell-loss">-${formatBRL2(row.perdaAcumulada)}</td>
+      `;
+      tbody.appendChild(tr);
     });
   }
 
+
+  /* ─── Tratamento de Erros da API ─── */
+
   function handleApiError(err) {
     if (err.message === 'RATE_LIMIT') {
-      showToast('Limite de consultas FIPE atingido. Tente novamente amanh\u00e3.');
+      showToast('Limite de consultas FIPE atingido. Tente novamente amanhã ou registre um token gratuito em fipe.online.');
     } else if (err.message && err.message.startsWith('FIPE_ERROR')) {
-      showToast('Erro ao consultar a API FIPE. Tente novamente.');
+      showToast('Erro ao consultar a API FIPE. Tente novamente em instantes.');
     } else {
-      showToast('Erro de conex\u00e3o. Verifique sua internet.');
+      showToast('Erro de conexão. Verifique sua internet e tente novamente.');
     }
     console.error('[App] API Error:', err);
   }
 
+
+  /* ─── Init ─── */
+
+  // Verificar validade ao carregar
   checkFormValidity();
+
 })();

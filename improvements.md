@@ -1,0 +1,4 @@
+# Improvements
+
+- O gráfico e desvalorização do carro estão considerando apenas o valor pago no veículo e não o valor da tabela FIPE. Preciso que o gráfico e as comparações sejam baseados no valor da tabela FIPE. O valor pago deve ser apenas por questão de comparação. Ou seja, o gráfico deve mostrar o valor da tabela FIPE ao longo do tempo e o valor pago deve ser subtraído do valor da tabela FIPE para mostrar a economia ou prejuízo ao longo do tempo. Mantenha as outras funcionalidades iguais.
+- O site também deve permitir o valor de 0 reais para o valor do carro, que pode ser possível para os casos onde o veículo não foi comprado.
