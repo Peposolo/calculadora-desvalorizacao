@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calculadora de Desvalorização de Veículos | FIPE + IPCA</title>
+  <meta name="description" content="Calcule quanto seu carro, moto ou caminhão vai desvalorizar usando dados reais da Tabela FIPE e inflação IPCA do IBGE. Gráficos interativos e projeção ano a ano.">
+  <meta name="keywords" content="calculadora fipe, desvalorização carro, depreciação veículo, tabela fipe, ipca, inflação">
+  <meta property="og:title" content="Calculadora de Desvalorização Automotiva">
+  <meta property="og:description" content="Descubra quanto seu veículo vai perder de valor ao longo dos anos com dados FIPE reais.">
+  <meta property="og:type" content="website">
+
+  <!-- Favicon -->
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js" defer></script>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- HEADER / HERO                               -->
+  <!-- ═══════════════════════════════════════════ -->
+  <header class="hero" id="hero">
+    <div class="hero__glow"></div>
+    <div class="container">
+      <p class="hero__tag">FIPE + IPCA em tempo real</p>
+      <h1 class="hero__title">
+        Calculadora de<br>
+        <span class="hero__accent">Desvalorização</span> Automotiva
+      </h1>
+      <p class="hero__subtitle">
+        Descubra quanto seu veículo vai perder de valor ao longo dos anos 
+        usando dados reais da Tabela FIPE e inflação IPCA do IBGE.
+      </p>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MAIN CONTENT                                 -->
+  <!-- ═══════════════════════════════════════════ -->
+  <main class="container main-grid">
+
+    <!-- ─── Formulário ─── -->
+    <section class="card card--form" id="formulario" aria-label="Dados do veículo">
+      <h2 class="card__title">
+        <svg class="card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0H9"/></svg>
+        Dados do Veículo
+      </h2>
+
+      <form id="form-veiculo" novalidate>
+        <!-- Tipo de veículo -->
+        <div class="form-group">
+          <label for="tipo" class="form-label">Tipo de veículo <span class="required">*</span></label>
+          <div class="select-wrapper">
+            <select id="tipo" class="form-select" required>
+              <option value="">Selecione...</option>
+              <option value="cars">🚗 Carros</option>
+              <option value="motorcycles">🏍️ Motos</option>
+              <option value="trucks">🚛 Caminhões</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Marca -->
+        <div class="form-group" id="grupo-marca">
+          <label for="marca" class="form-label">Marca <span class="required">*</span></label>
+          <div class="select-wrapper">
+            <select id="marca" class="form-select" required disabled>
+              <option value="">Selecione o tipo primeiro</option>
+            </select>
+          </div>
+          <div class="skeleton-line" id="skeleton-marca" hidden></div>
+        </div>
+
+        <!-- Modelo -->
+        <div class="form-group" id="grupo-modelo">
+          <label for="modelo" class="form-label">Modelo <span class="required">*</span></label>
+          <div class="select-wrapper">
+            <select id="modelo" class="form-select" required disabled>
+              <option value="">Selecione a marca primeiro</option>
+            </select>
+          </div>
+          <div class="skeleton-line" id="skeleton-modelo" hidden></div>
+        </div>
+
+        <!-- Ano -->
+        <div class="form-group" id="grupo-ano">
+          <label for="ano" class="form-label">Ano / Combustível <span class="required">*</span></label>
+          <div class="select-wrapper">
+            <select id="ano" class="form-select" required disabled>
+              <option value="">Selecione o modelo primeiro</option>
+            </select>
+          </div>
+          <div class="skeleton-line" id="skeleton-ano" hidden></div>
+        </div>
+
+        <!-- Preço FIPE atual (readonly, preenchido pela API) -->
+        <div class="form-group" id="grupo-preco-fipe" hidden>
+          <label class="form-label">Preço FIPE Atual</label>
+          <div class="fipe-badge" id="preco-fipe-badge">
+            <span id="preco-fipe-valor">—</span>
+          </div>
+        </div>
+
+        <hr class="form-divider">
+
+        <!-- Preço de compra -->
+        <div class="form-group">
+          <label for="preco" class="form-label">Preço de compra (R$) <span class="required">*</span></label>
+          <input type="number" id="preco" class="form-input" placeholder="Ex: 55000" min="1" step="100" required>
+        </div>
+
+        <!-- Tempo de projeção -->
+        <div class="form-group">
+          <label for="tempo" class="form-label">
+            Tempo de projeção: <strong id="tempo-valor">5</strong> anos <span class="required">*</span>
+          </label>
+          <input type="range" id="tempo" class="form-range" min="1" max="20" value="5" required>
+          <div class="range-labels">
+            <span>1 ano</span>
+            <span>20 anos</span>
+          </div>
+        </div>
+
+        <hr class="form-divider">
+
+        <!-- Opcionais -->
+        <details class="form-details">
+          <summary class="form-details__summary">⚙️ Ajustes opcionais</summary>
+          <div class="form-details__body">
+            <!-- Km anual -->
+            <div class="form-group">
+              <label for="km" class="form-label">Quilometragem anual (km)</label>
+              <input type="number" id="km" class="form-input" placeholder="12000" min="0" step="1000" value="12000">
+            </div>
+
+            <!-- Conservação -->
+            <div class="form-group">
+              <label for="conservacao" class="form-label">Estado de conservação</label>
+              <div class="select-wrapper">
+                <select id="conservacao" class="form-select">
+                  <option value="excelente">Excelente (-1% na depreciação)</option>
+                  <option value="bom" selected>Bom (padrão)</option>
+                  <option value="regular">Regular (+1% na depreciação)</option>
+                  <option value="ruim">Ruim (+2% na depreciação)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Botão -->
+        <button type="submit" class="btn btn--primary" id="btn-calcular" disabled>
+          <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 13a8 8 0 0 1 7 7a6 6 0 0 0 3-5a9 9 0 0 0 6-8a3 3 0 0 0-3-3a9 9 0 0 0-8 6a6 6 0 0 0-5 3"/><path d="M7 14a6 6 0 0 0-3 6a6 6 0 0 0 6-3"/></svg>
+          Calcular Desvalorização
+        </button>
+      </form>
+    </section>
+
+    <!-- ─── Resultados ─── -->
+    <section class="results-area" id="resultados-area">
+
+      <!-- Toast de erro -->
+      <div class="toast toast--error" id="toast-erro" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        <span id="toast-msg">Erro desconhecido</span>
+      </div>
+
+      <!-- Placeholder quando nenhum resultado -->
+      <div class="empty-state" id="empty-state">
+        <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
+        </svg>
+        <p class="empty-state__text">Preencha os dados do veículo e clique em <strong>"Calcular"</strong> para ver os resultados aqui.</p>
+      </div>
+
+      <!-- Cards de resultado (ocultos inicialmente) -->
+      <div class="results-cards" id="resultados" hidden>
+        <!-- Card Depreciação -->
+        <div class="result-card result-card--depreciation">
+          <div class="result-card__header">
+            <span class="result-card__label">Valor Estimado após</span>
+            <span class="result-card__period" id="res-periodo">5 anos</span>
+          </div>
+          <div class="result-card__value" id="res-valor-final">R$ 0,00</div>
+          <div class="result-card__meta">
+            <div class="result-card__row">
+              <span>Preço de compra</span>
+              <span id="res-preco-compra">R$ 0,00</span>
+            </div>
+            <div class="result-card__row result-card__row--loss">
+              <span>Perda total</span>
+              <span id="res-perda-total">-R$ 0,00</span>
+            </div>
+            <div class="result-card__row">
+              <span>Perda percentual</span>
+              <span id="res-perda-percent">0%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card Inflação -->
+        <div class="result-card result-card--inflation">
+          <div class="result-card__header">
+            <span class="result-card__label">Correção pela Inflação (IPCA)</span>
+            <span class="result-card__badge" id="res-ipca-taxa">~4,5% a.a.</span>
+          </div>
+          <div class="result-card__value" id="res-valor-corrigido">R$ 0,00</div>
+          <div class="result-card__meta">
+            <div class="result-card__row">
+              <span>Se o dinheiro acompanhasse o IPCA</span>
+              <span id="res-valor-ipca">R$ 0,00</span>
+            </div>
+            <div class="result-card__row result-card__row--loss">
+              <span>Perda real (ajustada)</span>
+              <span id="res-perda-real">-R$ 0,00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gráfico -->
+      <div class="card card--chart" id="grafico-container" hidden>
+        <h2 class="card__title">
+          <svg class="card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M20 18l-8-8-4 4-5-5"/></svg>
+          Evolução do Valor ao Longo do Tempo
+        </h2>
+        <div class="chart-wrapper">
+          <canvas id="grafico" aria-label="Gráfico de desvalorização vs inflação"></canvas>
+        </div>
+      </div>
+
+      <!-- Tabela -->
+      <div class="card card--table" id="tabela-container" hidden>
+        <h2 class="card__title">
+          <svg class="card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5z"/><path d="M3 10h18"/><path d="M10 3v18"/></svg>
+          Detalhamento Ano a Ano
+        </h2>
+        <div class="table-scroll">
+          <table class="data-table" id="tabela-dados">
+            <thead>
+              <tr>
+                <th>Ano</th>
+                <th>Valor Depreciado</th>
+                <th>Valor Corrigido (IPCA)</th>
+                <th>Perda no Ano</th>
+                <th>Perda Acumulada</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-body">
+              <!-- Gerado via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- FOOTER                                       -->
+  <!-- ═══════════════════════════════════════════ -->
+  <footer class="footer">
+    <div class="container">
+      <p>Dados de depreciação: <a href="https://fipe.online" target="_blank" rel="noopener">Tabela FIPE (Parallelum API)</a></p>
+      <p>Dados de inflação: <a href="https://sidra.ibge.gov.br/" target="_blank" rel="noopener">IBGE SIDRA — IPCA</a></p>
+      <p class="footer__disclaimer">Os valores apresentados são estimativas baseadas em médias históricas e não representam preços reais de mercado.</p>
+    </div>
+  </footer>
+
+  <!-- Scripts (módulos carregados em ordem) -->
+  <script src="js/api.js"></script>
+  <script src="js/calculator.js"></script>
+  <script src="js/chart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
