@@ -1,2 +1,1 @@
 # Improvements
-- O problema na versão mobile persiste. Os screenshots do Claude não estão de acordo com a versão mobile. Ele apenas redimensionou a janela do browser mas não mediu a imagem como celular. Preciso que a imagem seja medida na página do inspect do chrome, ativando a opção de toggle device toolbar e selecionando a opção de celular. Estou utilizando um Iphone 14 pro max referência.
