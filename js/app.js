@@ -452,8 +452,8 @@
    * @param {string} prefixo
    * @param {number} valor — positivo = vantagem do usuário, negativo = perda
    * @param {boolean} semCompra — se true, esconde o elemento
-   * @param {string} labelPositivo — texto após "—" quando valor > 0
-   * @param {string} labelNegativo — texto após "—" quando valor < 0
+   * @param {string} labelPositivo — texto após " - " quando valor > 0
+   * @param {string} labelNegativo — texto após " - " quando valor < 0
    * @param {string} labelZero — texto quando valor === 0
    */
   function renderDiferenca(el, prefixo, valor, semCompra, labelPositivo, labelNegativo, labelZero) {
@@ -466,10 +466,10 @@
     }
     el.hidden = false;
     if (valor > 0) {
-      el.textContent = `${prefixo} — ${labelPositivo}: ${formatBRL(valor)}`;
+      el.textContent = `${prefixo} - ${labelPositivo}: ${formatBRL(valor)}`;
       el.className = 'result-card__comparacao result-card__comparacao--positive';
     } else if (valor < 0) {
-      el.textContent = `${prefixo} — ${labelNegativo}: ${formatBRL(Math.abs(valor))}`;
+      el.textContent = `${prefixo} - ${labelNegativo}: ${formatBRL(Math.abs(valor))}`;
       el.className = 'result-card__comparacao result-card__comparacao--negative';
     } else {
       el.textContent = `${prefixo}: ${labelZero}`;
