@@ -20,12 +20,23 @@ const DepreciationChart = (() => {
   }
 
   /**
-   * Cria ou atualiza o gráfico de depreciação vs inflação.
+   * Cria ou atualiza o gráfico em moeda nominal futura.
+   *
+   * Curvas:
+   *  • Laranja "Valor do veículo (FIPE + IPCA)": preço FIPE depreciando ano a
+   *    ano e ajustado pelo IPCA. Representa o valor real do veículo no futuro.
+   *  • Verde "Preço pago corrigido pelo IPCA": valor pago pelo usuário
+   *    corrigido apenas pela inflação, sem depreciação. Aparece somente quando
+   *    há preço de compra informado.
+   *  • A diferença (verde − laranja) representa o "gasto real" do veículo —
+   *    quanto o usuário efetivamente perdeu em termos reais.
+   *
    * @param {string} canvasId — id do <canvas>
-   * @param {number[]} serieDepreciacao — valores ano a ano
-   * @param {number[]} serieInflacao — valores ano a ano
+   * @param {number[]} serieDepreciacaoNominal — FIPE com IPCA + depreciação
+   * @param {number[]|null} seriePagoCorrigido — preço pago corrigido pelo IPCA (ou null)
+   * @param {number} [precoCompra=0] — desenha a curva verde se > 0
    */
-  function renderizar(canvasId, serieDepreciacao, serieInflacao) {
+  function renderizar(canvasId, serieDepreciacaoNominal, seriePagoCorrigido, precoCompra = 0) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
@@ -36,64 +47,69 @@ const DepreciationChart = (() => {
     }
 
     const ctx = canvas.getContext('2d');
-    const labels = serieDepreciacao.map((_, i) => i === 0 ? 'Hoje' : `Ano ${i}`);
+    const labels = serieDepreciacaoNominal.map((_, i) => i === 0 ? 'Hoje' : `Ano ${i}`);
 
     // Gradientes
-    const gradDepreciation = ctx.createLinearGradient(0, 0, 0, canvas.parentElement.clientHeight || 400);
-    gradDepreciation.addColorStop(0, 'rgba(242, 92, 5, 0.3)');
-    gradDepreciation.addColorStop(1, 'rgba(242, 92, 5, 0.0)');
+    const gradVeiculo = ctx.createLinearGradient(0, 0, 0, canvas.parentElement.clientHeight || 400);
+    gradVeiculo.addColorStop(0, 'rgba(242, 92, 5, 0.3)');
+    gradVeiculo.addColorStop(1, 'rgba(242, 92, 5, 0.0)');
 
-    const gradInflation = ctx.createLinearGradient(0, 0, 0, canvas.parentElement.clientHeight || 400);
-    gradInflation.addColorStop(0, 'rgba(99, 99, 128, 0.15)');
-    gradInflation.addColorStop(1, 'rgba(99, 99, 128, 0.0)');
+    const gradPago = ctx.createLinearGradient(0, 0, 0, canvas.parentElement.clientHeight || 400);
+    gradPago.addColorStop(0, 'rgba(46, 204, 113, 0.18)');
+    gradPago.addColorStop(1, 'rgba(46, 204, 113, 0.0)');
 
     // Cores do design system
     const colors = {
-      depreciation:  '#F25C05',
-      inflation:     '#636380',
+      veiculo:       '#F25C05',
+      pago:          '#2ECC71',
       grid:          'rgba(255, 255, 255, 0.04)',
       text:          '#7E7E9A',
       tooltipBg:     '#1A1A26',
       tooltipBorder: 'rgba(255, 255, 255, 0.08)'
     };
 
+    const datasets = [
+      {
+        label: 'Valor do veículo (FIPE + IPCA)',
+        data: serieDepreciacaoNominal,
+        borderColor: colors.veiculo,
+        backgroundColor: gradVeiculo,
+        borderWidth: 3,
+        fill: true,
+        tension: 0.35,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        pointBackgroundColor: colors.veiculo,
+        pointBorderColor: '#0A0A10',
+        pointBorderWidth: 2,
+        order: 1
+      }
+    ];
+
+    if (precoCompra > 0 && Array.isArray(seriePagoCorrigido)) {
+      datasets.push({
+        label: 'Preço pago corrigido pelo IPCA',
+        data: seriePagoCorrigido,
+        borderColor: colors.pago,
+        backgroundColor: gradPago,
+        borderWidth: 2,
+        borderDash: [6, 4],
+        fill: true,
+        tension: 0.25,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        pointBackgroundColor: colors.pago,
+        pointBorderColor: '#0A0A10',
+        pointBorderWidth: 2,
+        order: 2
+      });
+    }
+
     _instance = new Chart(ctx, {
       type: 'line',
       data: {
         labels,
-        datasets: [
-          {
-            label: 'Valor FIPE (Depreciação)',
-            data: serieDepreciacao,
-            borderColor: colors.depreciation,
-            backgroundColor: gradDepreciation,
-            borderWidth: 3,
-            fill: true,
-            tension: 0.35,
-            pointRadius: 4,
-            pointHoverRadius: 7,
-            pointBackgroundColor: colors.depreciation,
-            pointBorderColor: '#0A0A10',
-            pointBorderWidth: 2,
-            order: 1
-          },
-          {
-            label: 'Valor Corrigido (IPCA)',
-            data: serieInflacao,
-            borderColor: colors.inflation,
-            backgroundColor: gradInflation,
-            borderWidth: 2,
-            borderDash: [6, 4],
-            fill: true,
-            tension: 0.35,
-            pointRadius: 3,
-            pointHoverRadius: 6,
-            pointBackgroundColor: colors.inflation,
-            pointBorderColor: '#0A0A10',
-            pointBorderWidth: 2,
-            order: 2
-          }
-        ]
+        datasets
       },
       options: {
         responsive: true,

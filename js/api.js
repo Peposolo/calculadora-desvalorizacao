@@ -62,13 +62,26 @@ const FipeAPI = (() => {
 
     /**
      * Lista anos disponíveis para um modelo.
+     * Normaliza o ano "32000" (convenção FIPE para zero-quilômetro do modelo atual)
+     * em um nome legível "Zero KM".
      * @param {string} tipo
      * @param {string} codMarca
      * @param {string} codModelo
      * @returns {Promise<{code:string, name:string}[]>}
      */
-    getAnos(tipo, codMarca, codModelo) {
-      return _fetch(`/${tipo}/brands/${codMarca}/models/${codModelo}/years`);
+    async getAnos(tipo, codMarca, codModelo) {
+      const data = await _fetch(`/${tipo}/brands/${codMarca}/models/${codModelo}/years`);
+      if (!Array.isArray(data)) return data;
+      return data.map(item => {
+        if (!item || typeof item.name !== 'string') return item;
+        const isZeroKm = /^32000\b/.test(item.name) || (item.code && String(item.code).startsWith('32000'));
+        if (!isZeroKm) return item;
+        const fuel = item.name.replace(/^32000\s*/, '').trim();
+        return {
+          ...item,
+          name: fuel ? `Zero KM ${fuel}` : 'Zero KM'
+        };
+      });
     },
 
     /**

@@ -328,16 +328,19 @@
         conservacao: $conserv.value || 'bom'
       };
 
-      // 3. Calcular (baseado no preço FIPE)
+      // 3. Curvas: depreciação parte sempre do preço FIPE (valor real do veículo)
       const serieDepreciacao = Calculator.calcularDepreciacao(precoFipe, anos, ajustes);
-      const serieInflacao    = Calculator.calcularInflacao(precoFipe, anos, taxaIpca);
-      const resumo           = Calculator.calcularResumo(serieDepreciacao, serieInflacao, precoFipe, precoCompra);
-      const tabelaDados      = Calculator.gerarTabelaAnual(serieDepreciacao, serieInflacao, precoFipe);
+      const resumo           = Calculator.calcularResumo(serieDepreciacao, precoFipe, precoCompra, taxaIpca);
+      const tabelaDados      = Calculator.gerarTabelaAnual(
+        resumo.serieDepreciacaoNominal,
+        resumo.seriePagoCorrigido,
+        precoFipe
+      );
 
-      // 4. Renderizar resultados
+      // 4. Renderizar resultados (curvas em moeda nominal futura)
       renderResultados(resumo, taxaIpca);
-      renderGrafico(serieDepreciacao, serieInflacao);
-      renderTabela(tabelaDados);
+      renderGrafico(resumo.serieDepreciacaoNominal, resumo.seriePagoCorrigido, precoCompra);
+      renderTabela(tabelaDados, precoCompra);
 
       // 5. Mostrar seções
       $emptyState.hidden = true;
@@ -367,68 +370,178 @@
   /* ─── Renderizadores ─── */
 
   function renderResultados(resumo, taxaIpca) {
-    // Período
-    document.getElementById('res-periodo').textContent = `${resumo.anos} ano${resumo.anos > 1 ? 's' : ''}`;
+    const periodoLabel = `${resumo.anos} ano${resumo.anos > 1 ? 's' : ''}`;
+    document.getElementById('res-periodo').textContent = periodoLabel;
+    const $periodoPago = document.getElementById('res-periodo-pago');
+    if ($periodoPago) $periodoPago.textContent = periodoLabel;
 
-    // Card Depreciação (baseado na FIPE)
-    animateValue(document.getElementById('res-valor-final'), 0, resumo.valorFinal);
-    document.getElementById('res-preco-compra').textContent = formatBRL(resumo.precoCompra);
+    const semCompra = !resumo.temCompra;
 
-    // Mostrar preço FIPE de referência
-    const $resFipe = document.getElementById('res-preco-fipe');
-    if ($resFipe) $resFipe.textContent = formatBRL(resumo.precoFipe);
+    // Card 1 — Hero 1: Valor estimado ajustado do veículo (FIPE + IPCA + depreciação)
+    animateValue(document.getElementById('res-valor-final'), 0, resumo.valorFinalNominal);
 
-    document.getElementById('res-perda-total').textContent = `-${formatBRL(resumo.perdaFipeNominal)}`;
-    document.getElementById('res-perda-percent').textContent = `-${resumo.perdaFipePercentual.toFixed(1)}%`;
+    // Card 1 — Hero 2: Preço pago corrigido pelo IPCA (escondido quando sem compra)
+    const $heroPago = document.getElementById('result-hero-pago');
+    if ($heroPago) $heroPago.hidden = semCompra;
 
-    // Indicador de comparação compra vs FIPE
-    const $comparacao = document.getElementById('res-comparacao');
-    if ($comparacao) {
-      const diff = resumo.diferencaCompra;
-      if (diff > 0) {
-        $comparacao.textContent = `Economia: ${formatBRL(diff)}`;
-        $comparacao.className = 'result-card__comparacao result-card__comparacao--positive';
-      } else if (diff < 0) {
-        $comparacao.textContent = `Acima da FIPE: ${formatBRL(Math.abs(diff))}`;
-        $comparacao.className = 'result-card__comparacao result-card__comparacao--negative';
-      } else {
-        $comparacao.textContent = 'Comprou pelo valor FIPE';
-        $comparacao.className = 'result-card__comparacao';
+    if (!semCompra) {
+      const ipcaPercent = (taxaIpca * 100).toFixed(1);
+      const $ipcaTaxa = document.getElementById('res-ipca-taxa');
+      $ipcaTaxa.textContent = `~${ipcaPercent}% a.a.`;
+      if (state.ipca && state.ipca.fonte === 'fallback') {
+        $ipcaTaxa.textContent += ' (est.)';
       }
+      animateValue(document.getElementById('res-valor-corrigido'), 0, resumo.valorPagoFinal);
     }
 
-    // Card Inflação
-    const ipcaPercent = (taxaIpca * 100).toFixed(1);
-    document.getElementById('res-ipca-taxa').textContent = `~${ipcaPercent}% a.a.`;
-    animateValue(document.getElementById('res-valor-corrigido'), 0, resumo.valorCorrigido);
-    document.getElementById('res-valor-ipca').textContent = formatBRL(resumo.valorCorrigido);
-    document.getElementById('res-perda-real').textContent = `-${formatBRL(resumo.perdaReal)}`;
+    // Card 2 — Variações e diferenças (oculto quando sem compra)
+    const $cardComp = document.getElementById('result-card-comparacao');
+    if ($cardComp) $cardComp.hidden = semCompra;
 
-    // Indicar se IPCA é fallback
-    if (state.ipca && state.ipca.fonte === 'fallback') {
-      document.getElementById('res-ipca-taxa').textContent += ' (est.)';
+    if (!semCompra) {
+      // Grupo "atual": no momento da compra, vs. FIPE atual
+      const $varAtual = document.getElementById('res-variacao-atual');
+      const $varAtualPct = document.getElementById('res-variacao-atual-percent');
+      $varAtual.textContent = signedBRLBig(resumo.variacaoAtual);
+      $varAtualPct.textContent = signedPercent(resumo.variacaoAtualPercentual);
+      aplicarSignClass($varAtual, resumo.variacaoAtual);
+      aplicarSignClass($varAtualPct, resumo.variacaoAtualPercentual);
+
+      // Grupo "após ajuste": após N anos, valor real do veículo vs. pago corrigido
+      const $varAjust = document.getElementById('res-variacao-ajustada');
+      const $varAjustPct = document.getElementById('res-variacao-ajustada-percent');
+      $varAjust.textContent = signedBRLBig(resumo.variacaoAposAjuste);
+      $varAjustPct.textContent = signedPercent(resumo.variacaoAposAjustePercentual);
+      aplicarSignClass($varAjust, resumo.variacaoAposAjuste);
+      aplicarSignClass($varAjustPct, resumo.variacaoAposAjustePercentual);
+
+      renderDiferenca(
+        document.getElementById('res-comparacao-inicial'),
+        'Diferença inicial',
+        resumo.diferencaInicial,
+        false,
+        'pago abaixo da FIPE',
+        'pago acima da FIPE',
+        'pago igual à FIPE'
+      );
+      renderDiferenca(
+        document.getElementById('res-comparacao-final'),
+        `Diferença final (após ${periodoLabel})`,
+        resumo.diferencaFinal,
+        false,
+        'economia real do veículo',
+        'gasto real do veículo',
+        'empate com o pago corrigido'
+      );
     }
   }
 
-  function renderGrafico(serieDepreciacao, serieInflacao) {
-    DepreciationChart.renderizar('grafico', serieDepreciacao, serieInflacao);
+  /**
+   * Aplica classes de sinal (cell-positive / cell-loss) a um elemento.
+   */
+  function aplicarSignClass(el, valor) {
+    if (!el) return;
+    el.classList.remove('cell-positive', 'cell-loss');
+    if (valor > 0) el.classList.add('cell-positive');
+    else if (valor < 0) el.classList.add('cell-loss');
   }
 
-  function renderTabela(dados) {
+  /**
+   * Renderiza uma badge de diferença com rótulos contextuais.
+   * @param {HTMLElement} el
+   * @param {string} prefixo
+   * @param {number} valor — positivo = vantagem do usuário, negativo = perda
+   * @param {boolean} semCompra — se true, esconde o elemento
+   * @param {string} labelPositivo — texto após "—" quando valor > 0
+   * @param {string} labelNegativo — texto após "—" quando valor < 0
+   * @param {string} labelZero — texto quando valor === 0
+   */
+  function renderDiferenca(el, prefixo, valor, semCompra, labelPositivo, labelNegativo, labelZero) {
+    if (!el) return;
+    if (semCompra) {
+      el.textContent = '';
+      el.className = 'result-card__comparacao';
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    if (valor > 0) {
+      el.textContent = `${prefixo} — ${labelPositivo}: ${formatBRL(valor)}`;
+      el.className = 'result-card__comparacao result-card__comparacao--positive';
+    } else if (valor < 0) {
+      el.textContent = `${prefixo} — ${labelNegativo}: ${formatBRL(Math.abs(valor))}`;
+      el.className = 'result-card__comparacao result-card__comparacao--negative';
+    } else {
+      el.textContent = `${prefixo}: ${labelZero}`;
+      el.className = 'result-card__comparacao';
+    }
+  }
+
+  function renderGrafico(serieDepreciacaoNominal, seriePagoCorrigido, precoCompra) {
+    DepreciationChart.renderizar('grafico', serieDepreciacaoNominal, seriePagoCorrigido, precoCompra);
+  }
+
+  function renderTabela(dados, precoCompra) {
     const tbody = document.getElementById('tabela-body');
+    const $tabela = document.getElementById('tabela-dados');
     tbody.innerHTML = '';
+
+    const temCompra = !!precoCompra && precoCompra > 0;
+    if ($tabela) {
+      $tabela.classList.toggle('table--has-pago-corrigido', temCompra);
+    }
 
     dados.forEach(row => {
       const tr = document.createElement('tr');
+
+      const pagoCell = (temCompra && row.pagoCorrigido !== null)
+        ? `<td class="col-pago-corrigido">${formatBRL2(row.pagoCorrigido)}</td>`
+        : `<td class="col-pago-corrigido">—</td>`;
+
+      // gastoReal positivo = perda real (dinheiro corrigido > valor do veículo)
+      // Invertemos o sinal para que perda apareça em vermelho com prefixo −.
+      const gastoCell = (temCompra && row.gastoReal !== null)
+        ? `<td class="col-gasto-real ${signClass(-row.gastoReal)}">${signedBRL(-row.gastoReal)}</td>`
+        : `<td class="col-gasto-real">—</td>`;
+
       tr.innerHTML = `
         <td>${row.ano}º</td>
-        <td>${formatBRL2(row.depreciado)}</td>
-        <td>${formatBRL2(row.corrigido)}</td>
-        <td class="cell-loss">-${formatBRL2(row.perdaNoAno)}</td>
-        <td class="cell-loss">-${formatBRL2(row.perdaAcumulada)}</td>
+        <td>${formatBRL2(row.valorFipe)}</td>
+        ${pagoCell}
+        <td class="${signClass(row.variacaoNoAno)}">${signedBRL(row.variacaoNoAno)}</td>
+        <td class="${signClass(row.variacaoTotal)}">${signedBRL(row.variacaoTotal)}</td>
+        ${gastoCell}
       `;
       tbody.appendChild(tr);
     });
+  }
+
+  /** Retorna a classe CSS conforme o sinal (positivo = ganho, negativo = perda). */
+  function signClass(valor) {
+    if (valor > 0) return 'cell-positive';
+    if (valor < 0) return 'cell-loss';
+    return '';
+  }
+
+  /** Formata um número com sinal explícito (+/−) em moeda BRL com 2 casas. */
+  function signedBRL(valor) {
+    if (valor === 0) return formatBRL2(0);
+    const sinal = valor > 0 ? '+' : '−';
+    return `${sinal}${formatBRL2(Math.abs(valor))}`;
+  }
+
+  /** Versão sem casas decimais para os hero rows dos cards. */
+  function signedBRLBig(valor) {
+    if (valor === 0) return formatBRL(0);
+    const sinal = valor > 0 ? '+' : '−';
+    return `${sinal}${formatBRL(Math.abs(valor))}`;
+  }
+
+  /** Formata percentual com sinal explícito. */
+  function signedPercent(valor) {
+    if (valor === 0) return '0,0%';
+    const sinal = valor > 0 ? '+' : '−';
+    return `${sinal}${Math.abs(valor).toFixed(1).replace('.', ',')}%`;
   }
 
 

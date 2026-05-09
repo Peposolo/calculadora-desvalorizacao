@@ -207,50 +207,52 @@
 
       <!-- Cards de resultado (ocultos inicialmente) -->
       <div class="results-cards" id="resultados" hidden>
-        <!-- Card Depreciação -->
+        <!-- Card 1 — Hero 1: Valor do veículo (FIPE+IPCA+depreciação) + Hero 2: Pago corrigido -->
         <div class="result-card result-card--depreciation">
-          <div class="result-card__header">
-            <span class="result-card__label">Valor FIPE Estimado após</span>
-            <span class="result-card__period" id="res-periodo">5 anos</span>
+          <div class="result-card__hero">
+            <div class="result-card__header">
+              <span class="result-card__label">Valor estimado ajustado do veículo após</span>
+              <span class="result-card__period" id="res-periodo">5 anos</span>
+            </div>
+            <div class="result-card__value" id="res-valor-final">R$ 0,00</div>
           </div>
-          <div class="result-card__value" id="res-valor-final">R$ 0,00</div>
-          <div class="result-card__meta">
-            <div class="result-card__row">
-              <span>Preço FIPE atual</span>
-              <span id="res-preco-fipe">R$ 0,00</span>
+
+          <div class="result-card__hero result-card__hero--secondary" id="result-hero-pago" hidden>
+            <hr class="result-card__divider" />
+            <div class="result-card__header">
+              <span class="result-card__label">
+                Preço pago corrigido pelo IPCA após <span id="res-periodo-pago">5 anos</span>
+              </span>
+              <span class="result-card__badge" id="res-ipca-taxa">~4,5% a.a.</span>
             </div>
-            <div class="result-card__row">
-              <span>Preço de compra</span>
-              <span id="res-preco-compra">R$ 0,00</span>
-            </div>
-            <div class="result-card__row result-card__row--loss">
-              <span>Depreciação FIPE total</span>
-              <span id="res-perda-total">-R$ 0,00</span>
-            </div>
-            <div class="result-card__row">
-              <span>Depreciação FIPE percentual</span>
-              <span id="res-perda-percent">0%</span>
-            </div>
-            <div id="res-comparacao" class="result-card__comparacao"></div>
+            <div class="result-card__value" id="res-valor-corrigido">R$ 0,00</div>
           </div>
         </div>
 
-        <!-- Card Inflação -->
-        <div class="result-card result-card--inflation">
-          <div class="result-card__header">
-            <span class="result-card__label">Correção pela Inflação (IPCA)</span>
-            <span class="result-card__badge" id="res-ipca-taxa">~4,5% a.a.</span>
-          </div>
-          <div class="result-card__value" id="res-valor-corrigido">R$ 0,00</div>
+        <!-- Card 2 — Variações e diferenças (atual + após ajuste) -->
+        <div class="result-card result-card--inflation" id="result-card-comparacao" hidden>
           <div class="result-card__meta">
+            <!-- Grupo "atual": no momento da compra (vs. FIPE atual) -->
             <div class="result-card__row">
-              <span>Se o dinheiro acompanhasse o IPCA</span>
-              <span id="res-valor-ipca">R$ 0,00</span>
+              <span>Variação atual</span>
+              <span id="res-variacao-atual">R$ 0,00</span>
             </div>
-            <div class="result-card__row result-card__row--loss">
-              <span>Perda real (ajustada)</span>
-              <span id="res-perda-real">-R$ 0,00</span>
+            <div class="result-card__row">
+              <span>Variação percentual atual</span>
+              <span id="res-variacao-atual-percent">0%</span>
             </div>
+            <div id="res-comparacao-inicial" class="result-card__comparacao"></div>
+
+            <!-- Grupo "após ajuste": após N anos (FIPE depreciado + IPCA vs. pago corrigido) -->
+            <div class="result-card__row">
+              <span>Variação após ajuste</span>
+              <span id="res-variacao-ajustada">R$ 0,00</span>
+            </div>
+            <div class="result-card__row">
+              <span>Variação percentual após ajuste</span>
+              <span id="res-variacao-ajustada-percent">0%</span>
+            </div>
+            <div id="res-comparacao-final" class="result-card__comparacao"></div>
           </div>
         </div>
       </div>
@@ -284,10 +286,11 @@
             <thead>
               <tr>
                 <th>Ano</th>
-                <th>Valor Depreciado</th>
-                <th>Valor Corrigido (IPCA)</th>
-                <th>Perda no Ano</th>
-                <th>Perda Acumulada</th>
+                <th>Valor do Veículo</th>
+                <th class="col-pago-corrigido">Pago Corrigido</th>
+                <th>Variação no Ano</th>
+                <th>Variação Total</th>
+                <th class="col-gasto-real">Gasto Real</th>
               </tr>
             </thead>
             <tbody id="tabela-body">
