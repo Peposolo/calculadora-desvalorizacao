@@ -123,20 +123,24 @@ const Calculator = (() => {
    *
    * @param {number[]} serieDepreciacao — depreciação real do FIPE em moeda atual
    * @param {number} precoFipe — valor FIPE atual do veículo
-   * @param {number} precoCompra — valor pago pelo comprador (0 = sem compra)
+   * @param {number} precoCompra — valor pago pelo comprador (> 0 no fluxo normal)
    * @param {number} taxaIpca — taxa IPCA anual (decimal)
    * @returns {Object}
    */
   function calcularResumo(serieDepreciacao, precoFipe, precoCompra, taxaIpca) {
     const anos = serieDepreciacao.length - 1;
-    const temCompra = precoCompra > 0;
+    // No fluxo normal, o formulário exige preço positivo. Esta normalização
+    // mantém uma proteção defensiva caso a função seja chamada diretamente
+    // com valores vazios, não numéricos ou negativos.
+    const precoCompraSeguro = Number.isFinite(precoCompra) && precoCompra > 0 ? precoCompra : 0;
+    const temCompra = precoCompraSeguro > 0;
 
     // Curva do valor do veículo em moeda nominal futura (FIPE + depreciação + IPCA)
     const serieDepreciacaoNominal = aplicarInflacao(serieDepreciacao, taxaIpca);
 
     // Curva do preço pago corrigido pela inflação (sem depreciação)
     const seriePagoCorrigido = temCompra
-      ? calcularValorPagoCorrigido(precoCompra, anos, taxaIpca)
+      ? calcularValorPagoCorrigido(precoCompraSeguro, anos, taxaIpca)
       : null;
 
     // Valores no instante final
@@ -146,7 +150,7 @@ const Calculator = (() => {
     // ─── Variação ATUAL (no momento da compra, vs. FIPE) ────────────────
     // Compara o quanto o usuário pagou frente ao preço FIPE atual.
     // Positivo = pago abaixo da FIPE (economia); negativo = pago acima (prejuízo).
-    const variacaoAtual = temCompra ? precoFipe - precoCompra : 0;
+    const variacaoAtual = temCompra ? precoFipe - precoCompraSeguro : 0;
     const variacaoAtualPercentual = (temCompra && precoFipe > 0)
       ? (variacaoAtual / precoFipe) * 100
       : 0;
@@ -170,7 +174,7 @@ const Calculator = (() => {
 
     return {
       precoFipe,
-      precoCompra,
+      precoCompra: precoCompraSeguro,
       temCompra,
       anos,
       taxaIpca,
