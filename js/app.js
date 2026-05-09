@@ -143,7 +143,7 @@
     const modeloOk = !!$modelo.value;
     const anoOk    = !!$ano.value;
     const precoVal = parseFloat($preco.value);
-    const precoOk  = !isNaN(precoVal) && precoVal >= 0;
+    const precoOk  = !isNaN(precoVal) && precoVal > 0;
 
     $btnCalc.disabled = !(tipoOk && marcaOk && modeloOk && anoOk && precoOk);
   }
@@ -287,9 +287,9 @@
     const anos = parseInt($tempo.value, 10);
 
     // Validação
-    if (isNaN(precoCompra) || precoCompra < 0) {
+    if (isNaN(precoCompra) || precoCompra <= 0) {
       $preco.classList.add('invalid');
-      showToast('Informe um preço de compra válido (pode ser 0).');
+      showToast('Informe um preço de compra válido maior que zero.');
       return;
     }
     $preco.classList.remove('invalid');
@@ -380,9 +380,9 @@
     // Card 1 — Hero 1: Valor estimado ajustado do veículo (FIPE + IPCA + depreciação)
     animateValue(document.getElementById('res-valor-final'), 0, resumo.valorFinalNominal);
 
-    // Card 1 — Hero 2: Preço pago corrigido pelo IPCA (escondido quando sem compra)
+    // Card 1 — Hero 2: Preço pago corrigido pelo IPCA
     const $heroPago = document.getElementById('result-hero-pago');
-    if ($heroPago) $heroPago.hidden = semCompra;
+    if ($heroPago) $heroPago.hidden = false;
 
     if (!semCompra) {
       const ipcaPercent = (taxaIpca * 100).toFixed(1);
@@ -394,9 +394,9 @@
       animateValue(document.getElementById('res-valor-corrigido'), 0, resumo.valorPagoFinal);
     }
 
-    // Card 2 — Variações e diferenças (oculto quando sem compra)
+    // Card 2 — Variações e diferenças
     const $cardComp = document.getElementById('result-card-comparacao');
-    if ($cardComp) $cardComp.hidden = semCompra;
+    if ($cardComp) $cardComp.hidden = false;
 
     if (!semCompra) {
       // Grupo "atual": no momento da compra, vs. FIPE atual
