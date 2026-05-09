@@ -16,6 +16,7 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  background-color: var(--color-bg, #0A0A10);
 }
 
 /* ──────────────── 1. DESIGN TOKENS ──────────────── */
@@ -94,8 +95,12 @@ body {
   color: var(--color-text);
   background: var(--color-bg);
   min-height: 100vh;
-  overflow-x: hidden;
+  min-height: 100dvh;            /* dynamic viewport height — avoids iOS Safari bottom bar gap */
   -webkit-font-smoothing: antialiased;
+  /* Safe-area padding for iOS notch/home-indicator */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 a {
@@ -132,6 +137,12 @@ img, svg { display: block; max-width: 100%; }
 @media (max-width: 900px) {
   .main-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Prevent grid children from overflowing on mobile */
+  .main-grid > * {
+    min-width: 0;
+    max-width: 100%;
   }
 }
 
@@ -208,6 +219,8 @@ img, svg { display: block; max-width: 100%; }
   padding: var(--space-xl);
   backdrop-filter: blur(12px);
   transition: border-color var(--duration-base);
+  max-width: 100%;      /* never exceed parent width */
+  min-width: 0;         /* allow shrinking inside grid */
 }
 
 .card:hover {
@@ -282,6 +295,7 @@ img, svg { display: block; max-width: 100%; }
   appearance: none;
   -webkit-appearance: none;
   width: 100%;
+  max-width: 100%;
   padding: 12px 40px 12px 14px;
   font-family: var(--font-sans);
   font-size: var(--fs-small);
@@ -290,6 +304,9 @@ img, svg { display: block; max-width: 100%; }
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
   transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
 }
 
@@ -316,6 +333,7 @@ img, svg { display: block; max-width: 100%; }
 /* Input */
 .form-input {
   width: 100%;
+  max-width: 100%;
   padding: 12px 14px;
   font-family: var(--font-sans);
   font-size: var(--fs-small);

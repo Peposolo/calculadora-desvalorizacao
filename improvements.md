@@ -1,1 +1,3 @@
 # Improvements
+- No iphone 13, o site parecia ok. Agora no iphone 14 a parte dos dados do veículo aparece cortada, enquanto que o resto permance ok. Upei uma imagem para demonstrar o problema. Quero que corrija-o.
+- Outro problema aparente é que em alguns browsers existem um pequenos gaps em algumas partes da tela que deixam o site com uma aparência um pouco estranha. No safari, por exemplo, tem um gap escuro no topo, enquanto que no google chrome tem um gap branco lá embaixo (imagens acompanham).
